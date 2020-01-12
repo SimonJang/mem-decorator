@@ -1,12 +1,14 @@
 import * as mem from 'mem';
 
 /**
- * Factory function to create a memoization annotation
+ * Factory function to create a memoization annotation.
  *
- * @param config - Configuration object for `mem`
+ * @param config - Configuration object for `mem`.
  */
-export function memoize(config?: mem.Options<any, any, unknown>) {
-	return (_: Object, __: string, descriptor: PropertyDescriptor) => {
+export function memoize(
+	config?: mem.Options<any, any, unknown>
+): (target: Object, key: string, descriptor: PropertyDescriptor) => PropertyDescriptor {
+	return (_, __, descriptor) => {
 		const symbol = Symbol.for('mem-decorator');
 		const method = descriptor.get ? 'get' : 'value';
 		const targetFunction = descriptor[method];
