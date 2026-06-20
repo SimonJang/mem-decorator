@@ -1,5 +1,6 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
 import {memoize} from '..';
-import test from 'ava';
 
 // Mock class for memoization testing
 class Counter {
@@ -10,9 +11,14 @@ class Counter {
 		this.name_ = name;
 	}
 
-	@memoize()
 	increment(amount: number) {
 		this.series += amount;
+
+		return this.getCounter();
+	}
+
+	decrement(amount: number) {
+		this.series -= amount;
 
 		return this.getCounter();
 	}
@@ -21,13 +27,26 @@ class Counter {
 		return this.series;
 	}
 
-	@memoize()
 	get name(): string {
 		return this.name_;
 	}
 }
 
-test('Testing memoization', t => {
+const decorate = (target: Object, key: string): void => {
+	const descriptor = Object.getOwnPropertyDescriptor(target, key);
+
+	if (!descriptor) {
+		throw Error(`Missing descriptor for ${key}`);
+	}
+
+	Object.defineProperty(target, key, memoize()(target, key, descriptor));
+};
+
+decorate(Counter.prototype, 'increment');
+decorate(Counter.prototype, 'decrement');
+decorate(Counter.prototype, 'name');
+
+test('Testing memoization', (t) => {
 	const counter = new Counter('counter1');
 	const counter2 = new Counter('counter2');
 
@@ -36,15 +55,19 @@ test('Testing memoization', t => {
 
 	counter2.increment(1);
 
-	t.is(counter.getCounter(), 1);
-	t.is(counter2.getCounter(), 1);
+	assert.equal(counter.getCounter(), 1);
+	assert.equal(counter2.getCounter(), 1);
 
 	counter2.increment(1);
-	t.is(counter2.getCounter(), 1);
+	assert.equal(counter2.getCounter(), 1);
 
 	counter2.increment(2);
-	t.is(counter2.getCounter(), 3);
+	assert.equal(counter2.getCounter(), 3);
 
-	t.is(counter.name, 'counter1');
-	t.is(counter2.name, 'counter2');
+	counter2.decrement(1);
+	counter2.decrement(1);
+	assert.equal(counter2.getCounter(), 2);
+
+	assert.equal(counter.name, 'counter1');
+	assert.equal(counter2.name, 'counter2');
 });
