@@ -32,6 +32,31 @@ class Counter {
 	}
 }
 
+class DecoratedCounter {
+	private series = 0;
+	private nameCalls = 0;
+
+	constructor(private readonly name_: string) {}
+
+	@memoize()
+	increment(amount: number) {
+		this.series += amount;
+
+		return this.series;
+	}
+
+	@memoize()
+	get name(): string {
+		this.nameCalls++;
+
+		return this.name_;
+	}
+
+	getNameCalls(): number {
+		return this.nameCalls;
+	}
+}
+
 const decorate = (target: Object, key: string): void => {
 	const descriptor = Object.getOwnPropertyDescriptor(target, key);
 
@@ -70,4 +95,23 @@ test('Testing memoization', (t) => {
 
 	assert.equal(counter.name, 'counter1');
 	assert.equal(counter2.name, 'counter2');
+});
+
+test('Testing memoization with decorator syntax', () => {
+	const counter = new DecoratedCounter('counter1');
+	const counter2 = new DecoratedCounter('counter2');
+
+	counter.increment(1);
+	counter.increment(1);
+	counter2.increment(1);
+
+	assert.equal(counter.increment(1), 1);
+	assert.equal(counter2.increment(1), 1);
+	assert.equal(counter2.increment(2), 3);
+
+	assert.equal(counter.name, 'counter1');
+	assert.equal(counter.name, 'counter1');
+	assert.equal(counter.getNameCalls(), 1);
+	assert.equal(counter2.name, 'counter2');
+	assert.equal(counter2.getNameCalls(), 1);
 });
