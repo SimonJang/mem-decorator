@@ -20,17 +20,20 @@ type MemoizeDecorator = {
  * @param config - Configuration object for `mem`.
  */
 export function memoize(config?: mem.Options<any, any, unknown>): MemoizeDecorator {
-	const wrap = (targetFunction: TargetFunction, key: PropertyKey): TargetFunction =>
-		function (this: any) {
-			if (!this[symbol] || !this[symbol][key]) {
+	const wrap = (targetFunction: TargetFunction): TargetFunction => {
+		const cacheKey = Symbol('mem-decorator-cache');
+
+		return function (this: any) {
+			if (!this[symbol] || !this[symbol][cacheKey]) {
 				this[symbol] = {
 					...this[symbol],
-					[key]: mem(targetFunction, config),
+					[cacheKey]: mem(targetFunction, config),
 				};
 			}
 
-			return this[symbol][key].apply(this, arguments);
+			return this[symbol][cacheKey].apply(this, arguments);
 		};
+	};
 
 	return ((
 		targetOrValue: Object | TargetFunction,
@@ -38,18 +41,17 @@ export function memoize(config?: mem.Options<any, any, unknown>): MemoizeDecorat
 		descriptor?: PropertyDescriptor,
 	) => {
 		if (typeof keyOrContext === 'object' && 'kind' in keyOrContext) {
-			return wrap(targetOrValue as TargetFunction, keyOrContext.name);
+			return wrap(targetOrValue as TargetFunction);
 		}
 
 		if (!descriptor) {
 			throw new Error('Missing property descriptor');
 		}
 
-		const key = keyOrContext as PropertyKey;
 		const method = descriptor.get ? 'get' : 'value';
 		const targetFunction = descriptor[method];
 
-		descriptor[method] = wrap(targetFunction, key);
+		descriptor[method] = wrap(targetFunction);
 
 		return descriptor;
 	}) as MemoizeDecorator;
