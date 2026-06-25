@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
+import {mkdtempSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {memoize} from '..';
 
@@ -140,4 +144,50 @@ test('Testing decorated override with decorated super method', () => {
 	assert.equal(counter.foo(1), 'child:base:1');
 	assert.equal(counter.foo(1), 'child:base:1');
 	assert.equal(counter.foo(2), 'child:base:3');
+});
+
+test('Testing symbol-named method decorator typings', () => {
+	const directory = mkdtempSync(path.join(tmpdir(), 'mem-decorator-symbol-'));
+	const fixture = path.join(directory, 'fixture.ts');
+	const importPath = path.join(process.cwd(), 'lib/index').replaceAll('\\', '/');
+
+	writeFileSync(
+		fixture,
+		`
+import {memoize} from '${importPath}';
+
+const method = Symbol('method');
+
+class Counter {
+	n = 0;
+
+	@memoize()
+	[method](amount: number) {
+		this.n += amount;
+		return this.n;
+	}
+}
+
+new Counter()[method](1);
+`,
+	);
+
+	const result = spawnSync(
+		path.join(process.cwd(), 'node_modules/.bin/tsc'),
+		[
+			'--ignoreConfig',
+			'--noEmit',
+			'--target',
+			'es2017',
+			'--module',
+			'commonjs',
+			'--strict',
+			'--experimentalDecorators',
+			'--skipLibCheck',
+			fixture,
+		],
+		{cwd: process.cwd(), encoding: 'utf8'},
+	);
+
+	assert.equal(result.status, 0, result.stderr || result.stdout);
 });
