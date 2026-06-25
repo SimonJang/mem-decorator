@@ -1,4 +1,4 @@
-# mem-decorator [![Build Status](https://travis-ci.org/SimonJang/mem-decorator.svg?branch=master)](https://travis-ci.org/SimonJang/mem-decorator)
+# mem-decorator [![CI](https://github.com/SimonJang/mem-decorator/actions/workflows/ci.yml/badge.svg)](https://github.com/SimonJang/mem-decorator/actions/workflows/ci.yml)
 
 > Decorator to [memoize](https://en.wikipedia.org/wiki/Memoization) a class method.
 
@@ -6,7 +6,7 @@
 
 ## Requirements
 
-- Node >= 8
+- Node >= 22
 
 ## Install
 
@@ -17,7 +17,7 @@ $ npm install mem-decorator --save
 ## Usage
 
 ```js
-const memoize = require('mem-decorator');
+const {memoize} = require('mem-decorator');
 
 class Fibonacci {
 	@memoize()
