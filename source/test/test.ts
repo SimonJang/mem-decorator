@@ -57,6 +57,22 @@ class DecoratedCounter {
 	}
 }
 
+class BaseCounter {
+	private series = 0;
+
+	foo(amount: number): string {
+		this.series += amount;
+
+		return `base:${this.series}`;
+	}
+}
+
+class ChildCounter extends BaseCounter {
+	foo(amount: number): string {
+		return `child:${super.foo(amount)}`;
+	}
+}
+
 const decorate = (target: Object, key: string): void => {
 	const descriptor = Object.getOwnPropertyDescriptor(target, key);
 
@@ -70,6 +86,8 @@ const decorate = (target: Object, key: string): void => {
 decorate(Counter.prototype, 'increment');
 decorate(Counter.prototype, 'decrement');
 decorate(Counter.prototype, 'name');
+decorate(BaseCounter.prototype, 'foo');
+decorate(ChildCounter.prototype, 'foo');
 
 test('Testing memoization', (t) => {
 	const counter = new Counter('counter1');
@@ -114,4 +132,12 @@ test('Testing memoization with decorator syntax', () => {
 	assert.equal(counter.getNameCalls(), 1);
 	assert.equal(counter2.name, 'counter2');
 	assert.equal(counter2.getNameCalls(), 1);
+});
+
+test('Testing decorated override with decorated super method', () => {
+	const counter = new ChildCounter();
+
+	assert.equal(counter.foo(1), 'child:base:1');
+	assert.equal(counter.foo(1), 'child:base:1');
+	assert.equal(counter.foo(2), 'child:base:3');
 });
