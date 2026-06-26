@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
+import {mkdtempSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {memoize} from '..';
 
@@ -32,6 +36,47 @@ class Counter {
 	}
 }
 
+class DecoratedCounter {
+	private series = 0;
+	private nameCalls = 0;
+
+	constructor(private readonly name_: string) {}
+
+	@memoize()
+	increment(amount: number) {
+		this.series += amount;
+
+		return this.series;
+	}
+
+	@memoize()
+	get name(): string {
+		this.nameCalls++;
+
+		return this.name_;
+	}
+
+	getNameCalls(): number {
+		return this.nameCalls;
+	}
+}
+
+class BaseCounter {
+	private series = 0;
+
+	foo(amount: number): string {
+		this.series += amount;
+
+		return `base:${this.series}`;
+	}
+}
+
+class ChildCounter extends BaseCounter {
+	foo(amount: number): string {
+		return `child:${super.foo(amount)}`;
+	}
+}
+
 const decorate = (target: Object, key: string): void => {
 	const descriptor = Object.getOwnPropertyDescriptor(target, key);
 
@@ -45,6 +90,8 @@ const decorate = (target: Object, key: string): void => {
 decorate(Counter.prototype, 'increment');
 decorate(Counter.prototype, 'decrement');
 decorate(Counter.prototype, 'name');
+decorate(BaseCounter.prototype, 'foo');
+decorate(ChildCounter.prototype, 'foo');
 
 test('Testing memoization', (t) => {
 	const counter = new Counter('counter1');
@@ -70,4 +117,77 @@ test('Testing memoization', (t) => {
 
 	assert.equal(counter.name, 'counter1');
 	assert.equal(counter2.name, 'counter2');
+});
+
+test('Testing memoization with decorator syntax', () => {
+	const counter = new DecoratedCounter('counter1');
+	const counter2 = new DecoratedCounter('counter2');
+
+	counter.increment(1);
+	counter.increment(1);
+	counter2.increment(1);
+
+	assert.equal(counter.increment(1), 1);
+	assert.equal(counter2.increment(1), 1);
+	assert.equal(counter2.increment(2), 3);
+
+	assert.equal(counter.name, 'counter1');
+	assert.equal(counter.name, 'counter1');
+	assert.equal(counter.getNameCalls(), 1);
+	assert.equal(counter2.name, 'counter2');
+	assert.equal(counter2.getNameCalls(), 1);
+});
+
+test('Testing decorated override with decorated super method', () => {
+	const counter = new ChildCounter();
+
+	assert.equal(counter.foo(1), 'child:base:1');
+	assert.equal(counter.foo(1), 'child:base:1');
+	assert.equal(counter.foo(2), 'child:base:3');
+});
+
+test('Testing symbol-named method decorator typings', () => {
+	const directory = mkdtempSync(path.join(tmpdir(), 'mem-decorator-symbol-'));
+	const fixture = path.join(directory, 'fixture.ts');
+	const importPath = path.join(process.cwd(), 'lib/index').replaceAll('\\', '/');
+
+	writeFileSync(
+		fixture,
+		`
+import {memoize} from '${importPath}';
+
+const method = Symbol('method');
+
+class Counter {
+	n = 0;
+
+	@memoize()
+	[method](amount: number) {
+		this.n += amount;
+		return this.n;
+	}
+}
+
+new Counter()[method](1);
+`,
+	);
+
+	const result = spawnSync(
+		path.join(process.cwd(), 'node_modules/.bin/tsc'),
+		[
+			'--ignoreConfig',
+			'--noEmit',
+			'--target',
+			'es2017',
+			'--module',
+			'commonjs',
+			'--strict',
+			'--experimentalDecorators',
+			'--skipLibCheck',
+			fixture,
+		],
+		{cwd: process.cwd(), encoding: 'utf8'},
+	);
+
+	assert.equal(result.status, 0, result.stderr || result.stdout);
 });
